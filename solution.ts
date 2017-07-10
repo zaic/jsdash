@@ -1,21 +1,52 @@
-'use strict';
+module Solution {
+    const FIELD_SIZE : number = 40;
 
-function find_player(screen){
-    for (let y = 0; y < screen.length; y++)
-    {
-        let row = screen[y];
-        for (let x = 0; x < row.length; x++)
-        {
-            if (row[x] == 'A')
-                return {x, y};
+    enum Direction {Left, Up, Right, Down}
+
+    class Subj {
+        public row: number;
+        public col: number;
+
+        constructor(row: number, col: number) {
+            this.row = row;
+            this.col = col;
         }
     }
+
+    export class Player extends Subj {
+        constructor(row: number, col: number) {
+            super(row, col);
+        }
+    }
+
+    export class Field {
+        public player: Player;
+
+        constructor(screen: Array<string>) {
+            for (let row = 0; row < FIELD_SIZE; ++row) {
+                for (let col = 0; col < FIELD_SIZE; ++col) {
+                    if (screen[row][col] == 'A') {
+                        this.player = new Player(row, col);
+                        break;
+                    }
+                }
+                if (this.player)
+                    break;
+            }
+        }
+    };
 }
+
+
 
 declare var exports: any;
 exports.play = function*(screen) {
     while (true) {
-        let {x, y} = find_player(screen);
+        let field = new Solution.Field(screen);
+        console.log(field);
+
+        let x = field.player.col;
+        let y = field.player.row;
         let moves = '';
         if (' :*'.includes(screen[y-1][x]))
             moves += 'u';
