@@ -7,6 +7,8 @@ module Solution {
     export const OUTPUT = "lurd";
 
     class Subj {
+        public static CHAR: string;
+
         public row: number;
         public col: number;
 
@@ -14,26 +16,69 @@ module Solution {
             this.row = row;
             this.col = col;
         }
-
-        public distTo(other: Subj): number {
-            return Math.abs(this.row - other.row) + Math.abs(this.col - other.col);
-        }
     }
 
-    export class Player extends Subj {
+    interface Fallable {
+        shouldFall: boolean;
+    }
+
+    class Player extends Subj {
+        public static CHAR: string = 'A';
+
         constructor(row: number, col: number) {
             super(row, col);
         }
     }
 
-    class Diamon extends Subj {
-        
+    class Diamon extends Subj implements Fallable {
+        public static CHAR: string = '*';
+
+        public shouldFall: boolean = false;
+    }
+
+    class Fly extends Subj {
+        public static CHAR: string = '-|/\\';
+
+        public dir: Direction;
+
+        constructor(row: number, col: number, dir: Direction) {
+            super(row, col);
+            this.dir = dir;
+        }
+
+        public doTurn(screen: Array<string>) {
+            let points = new Array(4);
+            for (let i = 0; i < 4; i++)
+                points[i] = this.point.step(i);
+            let neighbors = points.map(p=>this.world.get(p));
+            let locked = true;
+            for (let neighbor of neighbors)
+            {
+                if (!neighbor)
+                    locked = false;
+                else if (neighbor === this.world.player)
+                    return this.explode();
+            }
+            if (locked)
+                return this.explode();
+            let left = ccw(this.dir);
+            if (!neighbors[left])
+            {
+                this.move(points[left]);
+                this.dir = left;
+            }
+            else if (!neighbors[this.dir])
+                this.move(points[this.dir]);
+            else
+                this.dir = cw(this.dir);
+        }
     }
 
     export class Field {
         private screen: Array<string>;
-        public player: Player;
+        private player: Player;
         private diamonds: Array<Subj> = [];
+        private flies: Array<Fly> = [];
 
         private dist: Array<Array<number>>;
         private from: Array<Array<Direction>>;
@@ -42,14 +87,44 @@ module Solution {
             this.screen = screen;
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
-                    if (screen[row][col] == 'A') {
+                    if (screen[row][col] == Player.CHAR) {
                         this.player = new Player(row, col);
 
-                    } else if (screen[row][col] == '*') {
+                    } else if (screen[row][col] == Diamon.CHAR) {
                         this.diamonds.push(new Subj(row, col));
+
+                    } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
+                        this.flies.push(new Fly(row, col, Direction.Up));
                     }
                 }
             }
+        }
+
+        public doTurn(): Field {
+            let screen: Array<Array<string>> = [];
+            for (let row = 0; row < FIELD_HEIGHT; ++row) {
+                screen.push([]);
+                for (let col = 0; col < FIELD_WIDTH; ++col)
+                    screen[row].push(this.screen[row][col]);
+            }
+
+            for (let fly of this.flies) {
+                
+            }
+
+            let field = new Field(screen.map(s => s.join('')));
+            // flies change their directions
+            return field;
+        }
+
+        public debugCompare(other: Field): boolean {
+            for (var row = 0; row < FIELD_HEIGHT; ++row)
+                for (var col = 0; col < FIELD_WIDTH; ++col) {
+                    //if (this.screen[row][col])
+                    if (this.screen[row][col] != other.screen[row][col])
+                        return false;
+                }
+            return true;
         }
 
         private canGo(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
