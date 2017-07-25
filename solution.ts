@@ -6,15 +6,39 @@ module Solution {
     const MOVEMENT: Array<[number, number]> = [[0, -1], [-1, 0], [0, 1], [1, 0]];
     export const OUTPUT = "lurd";
 
+    //!todo: optimize directions
+    function GetDirectionCW(dir: Direction): Direction {
+        switch (dir) {
+            case Direction.Down : return Direction.Left ;
+            case Direction.Left : return Direction.Up   ;
+            case Direction.Up   : return Direction.Right;
+            case Direction.Right: return Direction.Down ;
+        }
+    }
+    function GetDirectionCCW(dir: Direction): Direction {
+        return GetDirectionCW(GetDirectionCW(GetDirectionCW(dir)));
+    }
+
     class Subj {
         public static CHAR: string;
 
         public row: number;
         public col: number;
 
+        private world: Field;
+        public isTurned: boolean = false;
+
         constructor(row: number, col: number) {
             this.row = row;
             this.col = col;
+        }
+
+        public doTurn(screen: Array<string>) {
+            this.isTurned = true;
+        }
+
+        protected move(dir: Direction) {
+            //!todo: implement
         }
     }
 
@@ -46,31 +70,61 @@ module Solution {
             this.dir = dir;
         }
 
-        public doTurn(screen: Array<string>) {
+        public doTurn(screen: Array<string>) { //!todo: convert field from string to objects
+            super.doTurn(screen);
+
             let points = new Array(4);
-            for (let i = 0; i < 4; i++)
-                points[i] = this.point.step(i);
-            let neighbors = points.map(p=>this.world.get(p));
+            for (let i = 0; i < 4; i++) {
+                points[i] = {
+                    row: this.row + MOVEMENT[i][0],
+                    col: this.col + MOVEMENT[i][1]
+                };
+            }
+            let neighbors: Array<Subj> = points.map(p => screen[p.row][p.col]);
+
             let locked = true;
-            for (let neighbor of neighbors)
+            for (let neighbor of neighbors) //!todo: unroll loop?
             {
                 if (!neighbor)
                     locked = false;
-                else if (neighbor === this.world.player)
+                else if (neighbor instanceof Player) //!todo: is it fast?
                     return this.explode();
             }
             if (locked)
                 return this.explode();
-            let left = ccw(this.dir);
-            if (!neighbors[left])
-            {
+                
+            let left = GetDirectionCCW(this.dir);
+            if (!neighbors[left]) {
                 this.move(points[left]);
                 this.dir = left;
-            }
-            else if (!neighbors[this.dir])
+
+            } else if (!neighbors[this.dir]) {
                 this.move(points[this.dir]);
-            else
-                this.dir = cw(this.dir);
+
+            } else {
+                this.dir = GetDirectionCW(this.dir);
+            }
+        }
+
+        private explode() {
+            this.alive = false;
+            let [rowFrom, rowTo] = [this.row - 1, this.row + 1];
+            let [colFrom, colTo] = [this.col - 1, this.col + 1];
+            for (let row = rowFrom; row <= rowTo; ++row) {
+                for (let col = colFrom; col <= colTo; ++col) {
+                    let point = new Point(x, y);
+                    let target = this.world.get(point);
+                    if (target)
+                    {
+                        if (!target.is_consumable())
+                            continue;
+                        if (target!==this)
+                            target.hit();
+                    }
+                    this.world.set(point, new Explosion(this.world));
+                }
+            }
+            this.world.butterfly_killed();
         }
     }
 
