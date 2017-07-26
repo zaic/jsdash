@@ -24,18 +24,21 @@ module Solution {
 
         public row: number;
         public col: number;
-
-        private world: Field;
         public isTurned: boolean = false;
 
-        constructor(row: number, col: number) {
+        protected world: World;
+
+        constructor(row: number, col: number, world: World) {
             this.row = row;
             this.col = col;
+            this.world = world;
         }
 
-        public doTurn(screen: Array<string>) {
+        public doTurn() {
             this.isTurned = true;
         }
+
+        public clone(world: World): Subj { return null; }
 
         protected move(dir: Direction) {
             //!todo: implement
@@ -49,8 +52,13 @@ module Solution {
     class Player extends Subj {
         public static CHAR: string = 'A';
 
-        constructor(row: number, col: number) {
-            super(row, col);
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
+
+        public clone(): Player {
+            let player = new Player(this.row, this.col, this.world);
+            return player;
         }
     }
 
@@ -65,13 +73,13 @@ module Solution {
 
         public dir: Direction;
 
-        constructor(row: number, col: number, dir: Direction) {
-            super(row, col);
+        constructor(row: number, col: number, world: World, dir: Direction) {
+            super(row, col, world);
             this.dir = dir;
         }
 
-        public doTurn(screen: Array<string>) { //!todo: convert field from string to objects
-            super.doTurn(screen);
+        public doTurn() { //!todo: convert field from string to objects
+            super.doTurn();
 
             let points = new Array(4);
             for (let i = 0; i < 4; i++) {
@@ -80,7 +88,7 @@ module Solution {
                     col: this.col + MOVEMENT[i][1]
                 };
             }
-            let neighbors: Array<Subj> = points.map(p => screen[p.row][p.col]);
+            let neighbors: Array<Subj> = points.map(p => this.world.get(p.row, p.col));
 
             let locked = true;
             for (let neighbor of neighbors) //!todo: unroll loop?
@@ -107,6 +115,7 @@ module Solution {
         }
 
         private explode() {
+            /*
             this.alive = false;
             let [rowFrom, rowTo] = [this.row - 1, this.row + 1];
             let [colFrom, colTo] = [this.col - 1, this.col + 1];
@@ -125,6 +134,84 @@ module Solution {
                 }
             }
             this.world.butterfly_killed();
+            */
+        }
+    }
+
+    export class World {
+        private field: Array<Array<Subj>>;
+
+        constructor(initializer: (World|Array<string>)) {
+            this.field = [];
+            if (initializer instanceof World)
+                this.initFromField(initializer);
+            else
+                this.initFromScreen(initializer);
+        }
+
+        private initFromScreen(screen: Array<string>) {
+            for (let row = 0; row < FIELD_HEIGHT; ++row) {
+                let convertedRow: Array<Subj> = [];
+                for (let col = 0; col < FIELD_WIDTH; ++col) {
+                    let subj: Subj = null;
+
+                    if (screen[row][col] == Player.CHAR) {
+                        subj = new Player(row, col, this);
+
+                    } else if (screen[row][col] == Diamon.CHAR) {
+                        subj = new Subj(row, col, this);
+
+                    } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
+                        subj = new Fly(row, col, this, Direction.Up);
+                    }
+
+                    convertedRow.push(subj);
+                }
+                this.field.push(convertedRow);
+            }
+        }
+
+        private initFromField(other: World) {
+            for (let row = 0; row < FIELD_HEIGHT; ++row) {
+                let convertedRow: Array<Subj> = [];
+                for (let col = 0; col < FIELD_WIDTH; ++col)
+                    convertedRow.push(other.field[row][col].clone(this));
+                this.field.push(convertedRow);
+            }
+        }
+
+        public doTurn() {
+            for (let row = 0; row < FIELD_HEIGHT; ++row) {
+                for (let col = 0; col < FIELD_WIDTH; ++col) {
+                    let subj = this.field[row][col];
+                    if (subj && !subj.isTurned)
+                        subj.doTurn();
+                }
+            }
+        }
+
+        public get(row: number, col: number): Subj {
+            return this.field[row][col];
+        }
+
+        private compareSubjs(left: Subj, right: Subj): boolean {
+            if (left instanceof Player || right instanceof Player) {
+                if (!(left instanceof Player && right instanceof Player))
+                    return false;
+            }
+            return true;
+        }
+
+        public compareWorlds(other: World): boolean {
+            for (let row = 0; row < FIELD_HEIGHT; ++row) {
+                for (let col = 0; col < FIELD_WIDTH; ++col) {
+                    let m = this.field[row][col];
+                    let o = other.field[row][col];
+                    if (!this.compareSubjs(m, o))
+                        return false;
+                }
+            }
+            return true;
         }
     }
 
@@ -142,13 +229,13 @@ module Solution {
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
                     if (screen[row][col] == Player.CHAR) {
-                        this.player = new Player(row, col);
+                        this.player = new Player(row, col, null);
 
                     } else if (screen[row][col] == Diamon.CHAR) {
-                        this.diamonds.push(new Subj(row, col));
+                        this.diamonds.push(new Subj(row, col, null));
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
-                        this.flies.push(new Fly(row, col, Direction.Up));
+                        this.flies.push(new Fly(row, col, null, Direction.Up));
                     }
                 }
             }
@@ -247,12 +334,24 @@ module Solution {
 
 declare var exports: any;
 exports.play = function*(screen) {
+    var lastWorld: Solution.World;
     while (true) {
+        /*
         let field = new Solution.Field(screen);
         console.log(field);
-
         let turn = field.getTurn();
         yield Solution.OUTPUT[turn];
+        */
+
+        let world = new Solution.World(screen);
+        //console.warn(world);
+
+        if (lastWorld)
+            console.warn("compare", world.compareWorlds(lastWorld));
+
+        world.doTurn();
+        lastWorld = world;
+        yield 't';
 
         /*
         let x = field.player.col;
