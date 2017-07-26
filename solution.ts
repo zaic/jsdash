@@ -2,9 +2,9 @@ module Solution {
     const FIELD_HEIGHT : number = 22;
     const FIELD_WIDTH : number = 40;
 
-    enum Direction {Left, Up, Right, Down}
-    const MOVEMENT: Array<[number, number]> = [[0, -1], [-1, 0], [0, 1], [1, 0]];
-    export const OUTPUT = "lurd";
+    enum Direction {Up, Right, Down, Left}
+    const MOVEMENT: Array<[number, number]> = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+    export const OUTPUT = "urdl";
 
     //!todo: optimize directions
     function GetDirectionCW(dir: Direction): Direction {
@@ -19,12 +19,12 @@ module Solution {
         return GetDirectionCW(GetDirectionCW(GetDirectionCW(dir)));
     }
 
-    class Subj {
+    abstract class Subj {
         public static CHAR: string;
 
         public row: number;
         public col: number;
-        public isTurned: boolean = false;
+        public lastTurnedFrame: number = -1;
 
         protected world: World;
 
@@ -35,13 +35,16 @@ module Solution {
         }
 
         public doTurn() {
-            this.isTurned = true;
+            this.lastTurnedFrame = this.world.frame;
         }
 
-        public clone(world: World): Subj { return null; }
+        public abstract clone(world: World): Subj;
 
         protected move(dir: Direction) {
-            //!todo: implement
+            const [nrow, ncol] = [this.row + MOVEMENT[dir][0], this.col + MOVEMENT[dir][1]];
+            this.world.field[nrow][ncol] = this;
+            this.world.field[this.row][this.col] = null;
+            [this.row, this.col] = [nrow, ncol];
         }
     }
 
@@ -66,6 +69,11 @@ module Solution {
         public static CHAR: string = '*';
 
         public shouldFall: boolean = false;
+        public readedChar: string = '?';
+
+        public clone(world: World): Diamon {
+            return new Diamon(this.row, this.col, world);
+        }
     }
 
     class Fly extends Subj {
@@ -78,24 +86,24 @@ module Solution {
             this.dir = dir;
         }
 
+        public clone(world: World): Fly {
+            return new Fly(this.row, this.col, world, this.dir);
+        }
+
         public doTurn() { //!todo: convert field from string to objects
             super.doTurn();
 
-            let points = new Array(4);
-            for (let i = 0; i < 4; i++) {
-                points[i] = {
-                    row: this.row + MOVEMENT[i][0],
-                    col: this.col + MOVEMENT[i][1]
-                };
-            }
-            let neighbors: Array<Subj> = points.map(p => this.world.get(p.row, p.col));
+            let neighbors: Array<Subj> = [0, 1, 2, 3].map(p => this.world.get(
+                this.row + MOVEMENT[p][0],
+                this.col + MOVEMENT[p][1]
+            ));
 
             let locked = true;
-            for (let neighbor of neighbors) //!todo: unroll loop?
+            for (let neighbor of neighbors)
             {
                 if (!neighbor)
                     locked = false;
-                else if (neighbor instanceof Player) //!todo: is it fast?
+                else if (neighbor instanceof Player)
                     return this.explode();
             }
             if (locked)
@@ -103,11 +111,11 @@ module Solution {
                 
             let left = GetDirectionCCW(this.dir);
             if (!neighbors[left]) {
-                this.move(points[left]);
+                this.move(left);
                 this.dir = left;
 
             } else if (!neighbors[this.dir]) {
-                this.move(points[this.dir]);
+                this.move(this.dir);
 
             } else {
                 this.dir = GetDirectionCW(this.dir);
@@ -139,7 +147,9 @@ module Solution {
     }
 
     export class World {
-        private field: Array<Array<Subj>>;
+        public field: Array<Array<Subj>>;
+
+        public frame: number = 0;
 
         constructor(initializer: (World|Array<string>)) {
             this.field = [];
@@ -158,8 +168,13 @@ module Solution {
                     if (screen[row][col] == Player.CHAR) {
                         subj = new Player(row, col, this);
 
-                    } else if (screen[row][col] == Diamon.CHAR) {
-                        subj = new Subj(row, col, this);
+                    } else if (screen[row][col] == Diamon.CHAR
+                        || screen[row][col] == ':'
+                        || screen[row][col] == 'O'
+                        || screen[row][col] == '+'
+                        || screen[row][col] == '#') {
+                        subj = new Diamon(row, col, this);
+                        subj.readedChar = screen[row][col];
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
                         subj = new Fly(row, col, this, Direction.Up);
@@ -178,13 +193,15 @@ module Solution {
                     convertedRow.push(other.field[row][col].clone(this));
                 this.field.push(convertedRow);
             }
+            this.frame = other.frame;
         }
 
         public doTurn() {
+            ++this.frame;
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
                     let subj = this.field[row][col];
-                    if (subj && !subj.isTurned)
+                    if (subj && subj.lastTurnedFrame < this.frame)
                         subj.doTurn();
                 }
             }
@@ -198,6 +215,12 @@ module Solution {
             if (left instanceof Player || right instanceof Player) {
                 if (!(left instanceof Player && right instanceof Player))
                     return false;
+
+            } else if (left instanceof Fly || right instanceof Fly) {
+                if (!(left instanceof Fly && right instanceof Fly)) {
+                    //console.warn("cmp", left, right);
+                    return false;
+                }
             }
             return true;
         }
@@ -232,7 +255,7 @@ module Solution {
                         this.player = new Player(row, col, null);
 
                     } else if (screen[row][col] == Diamon.CHAR) {
-                        this.diamonds.push(new Subj(row, col, null));
+                        this.diamonds.push(new Diamon(row, col, null));
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
                         this.flies.push(new Fly(row, col, null, Direction.Up));
@@ -344,13 +367,13 @@ exports.play = function*(screen) {
         */
 
         let world = new Solution.World(screen);
-        //console.warn(world);
 
         if (lastWorld)
             console.warn("compare", world.compareWorlds(lastWorld));
+        else
+            lastWorld = world;
 
-        world.doTurn();
-        lastWorld = world;
+        lastWorld.doTurn();
         yield 't';
 
         /*
