@@ -59,9 +59,20 @@ module Solution {
             super(row, col, world);
         }
 
-        public clone(): Player {
-            let player = new Player(this.row, this.col, this.world);
-            return player;
+        public clone(world: World): Player {
+            return new Player(this.row, this.col, world);
+        }
+    }
+
+    class EdgeWall extends Subj {
+        public static CHAR: string = '#';
+
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
+
+        public clone(world: World): EdgeWall {
+            return new EdgeWall(this.row, this.col, world);
         }
     }
 
@@ -168,16 +179,24 @@ module Solution {
                     if (screen[row][col] == Player.CHAR) {
                         subj = new Player(row, col, this);
 
+                    } else if (screen[row][col] == EdgeWall.CHAR) {
+                        subj = new EdgeWall(row, col, this);
+
                     } else if (screen[row][col] == Diamond.CHAR
                         || screen[row][col] == ':'
                         || screen[row][col] == 'O'
-                        || screen[row][col] == '+'
-                        || screen[row][col] == '#') {
+                        || screen[row][col] == '+') {
                         subj = new Diamond(row, col, this);
                         subj.readedChar = screen[row][col];
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
                         subj = new Fly(row, col, this, Direction.Up);
+
+                    } else if (screen[row][col] === ' ') {
+                        // nothing to do, empty cell
+
+                    } else {
+                        console.assert(false, "Unknow cell type", screen[row][col], "at", row, ",", col);
                     }
 
                     convertedRow.push(subj);
