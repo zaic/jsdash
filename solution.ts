@@ -90,6 +90,46 @@ module Solution {
         }
     }
 
+    class Brick extends Subj {
+        public static CHAR: string = '+';
+
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
+
+        public clone(world: World): Brick {
+            return new Brick(this.row, this.col, world);
+        }
+
+        public isRounded(): boolean {
+            return true;
+        }
+
+        public isConsumable(): boolean {
+            return true;
+        }
+    }
+
+    class Dirt extends Subj {
+        public static CHAR: string = ':';
+
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
+
+        public clone(world: World): Dirt {
+            return new Dirt(this.row, this.col, world);
+        }
+
+        public isRounded(): boolean {
+            return false;
+        }
+
+        public isConsumable(): boolean {
+            return true;
+        }
+    }
+
     abstract class Fallable extends Subj {
         protected isFalling: boolean = false;
 
@@ -105,7 +145,8 @@ module Solution {
                 if (this.roll(this.point().left()) || this.roll(this.point().right()))
                     return;
 
-            } else if (target && this.isFalling) {
+            }
+            if (target && this.isFalling) {
                 target.hit();
                 this.isFalling = false;
 
@@ -301,13 +342,17 @@ module Solution {
                     if (screen[row][col] === Player.CHAR) {
                         subj = new Player(row, col, this);
 
-                    } else if (screen[row][col] === EdgeWall.CHAR
-                        || screen[row][col] === ':'
-                        || screen[row][col] === '+') {
+                    } else if (screen[row][col] === EdgeWall.CHAR) {
                         subj = new EdgeWall(row, col, this);
 
                     } else if (screen[row][col] === Stone.CHAR) {
                         subj = new Stone(row, col, this);
+
+                    } else if (screen[row][col] === Brick.CHAR) {
+                        subj = new Brick(row, col, this);
+
+                    } else if (screen[row][col] === Dirt.CHAR) {
+                        subj = new Dirt(row, col, this);
 
                     } else if (screen[row][col] === Diamond.CHAR) {
                         subj = new Diamond(row, col, this);
@@ -364,6 +409,10 @@ module Solution {
 
             } else if (left instanceof Stone || right instanceof Stone) {
                 if (!(left instanceof Stone && right instanceof Stone))
+                    return false;
+
+            } else if (left instanceof Diamond || right instanceof Diamond) {
+                if (!(left instanceof Diamond && right instanceof Diamond))
                     return false;
 
             }
