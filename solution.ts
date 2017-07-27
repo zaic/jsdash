@@ -46,6 +46,9 @@ module Solution {
             this.world.field[this.row][this.col] = null;
             [this.row, this.col] = [nrow, ncol];
         }
+
+        protected abstract isRounder(): boolean;
+        protected abstract isConsumable(): boolean;
     }
 
     interface Fallable {
@@ -62,6 +65,14 @@ module Solution {
         public clone(world: World): Player {
             return new Player(this.row, this.col, world);
         }
+
+        protected isRounder(): boolean {
+            return false;
+        }
+
+        protected isConsumable(): boolean {
+            return true;
+        }
     }
 
     class EdgeWall extends Subj {
@@ -74,6 +85,14 @@ module Solution {
         public clone(world: World): EdgeWall {
             return new EdgeWall(this.row, this.col, world);
         }
+
+        protected isRounder(): boolean {
+            return false;
+        }
+
+        protected isConsumable(): boolean {
+            return false;
+        }
     }
 
     class Diamond extends Subj implements Fallable {
@@ -84,6 +103,14 @@ module Solution {
 
         public clone(world: World): Diamond {
             return new Diamond(this.row, this.col, world);
+        }
+
+        protected isRounder(): boolean {
+            return false;
+        }
+
+        protected isConsumable(): boolean {
+            return false;
         }
     }
 
@@ -154,6 +181,14 @@ module Solution {
             }
             this.world.butterfly_killed();
             */
+        }
+
+        protected isRounder(): boolean {
+            return false;
+        }
+
+        protected isConsumable(): boolean {
+            return true;
         }
     }
 
