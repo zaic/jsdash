@@ -19,6 +19,32 @@ module Solution {
         return GetDirectionCW(GetDirectionCW(GetDirectionCW(dir)));
     }
 
+    class Point {
+        public row: number;
+        public col: number;
+        
+        constructor(row: number, col: number) {
+            this.row = row;
+            this.col = col;
+        }
+
+        public step(dir: Direction): Point {
+            return new Point(this.row + MOVEMENT[dir][0], this.col + MOVEMENT[dir][1]);
+        }
+        public left(): Point {
+            return this.step(Direction.Left);
+        }
+        public right(): Point {
+            return this.step(Direction.Right);
+        }
+        public up(): Point {
+            return this.step(Direction.Up);
+        }
+        public down(): Point {
+            return this.step(Direction.Down);
+        }
+    }
+
     abstract class Subj {
         public static CHAR: string;
 
@@ -38,6 +64,10 @@ module Solution {
             this.lastTurnedFrame = this.world.frame;
         }
 
+        public point(): Point {
+            return new Point(this.row, this.col);
+        }
+
         public abstract clone(world: World): Subj;
 
         protected move(dir: Direction) {
@@ -46,9 +76,18 @@ module Solution {
             this.world.field[this.row][this.col] = null;
             [this.row, this.col] = [nrow, ncol];
         }
+        protected moveToPoint(point: Point) {
+            const [nrow, ncol] = [point.row, point.col];
+            this.world.field[nrow][ncol] = this;
+            this.world.field[this.row][this.col] = null;
+            [this.row, this.col] = [nrow, ncol];
+        }
 
-        protected abstract isRounded(): boolean;
-        protected abstract isConsumable(): boolean;
+        public abstract isRounded(): boolean;
+        public abstract isConsumable(): boolean;
+
+        public hit() {
+        }
     }
 
     abstract class Fallable extends Subj {
@@ -58,12 +97,53 @@ module Solution {
             super(row, col, world);
         }
 
-        protected isRounded(): boolean {
+        public doTurn() {
+            super.doTurn();
+
+            let target: Subj = this.world.get(this.row + MOVEMENT[Direction.Down][0], this.col + MOVEMENT[Direction.Down][1]);
+            if (target && target.isRounded()) {
+                if (this.roll(this.point().left()) || this.roll(this.point().right()))
+                    return;
+
+            } else if (target && this.isFalling) {
+                target.hit();
+                this.isFalling = false;
+
+            } else if (!target) {
+                this.isFalling = true;
+                this.moveToPoint(this.point().down());
+            }
+        }
+
+        private roll(to: Point): boolean {
+            let under = to.down();
+            if (this.world.get(to.row, to.col) || this.world.get(under.row, under.col))
+                return false;
+            this.isFalling = true;
+            this.moveToPoint(to);
+            return true;
+        }
+
+        public isRounded(): boolean {
             return !this.isFalling;
         }
 
-        protected isConsumable(): boolean {
+        public isConsumable(): boolean {
             return true;
+        }
+    }
+    
+    class Stone extends Fallable {
+        public static CHAR: string = 'O';
+
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
+
+        public clone(world: World): Stone {
+            let stone = new Stone(this.row, this.col, world);
+            stone.isFalling = this.isFalling;
+            return stone;
         }
     }
 
@@ -78,11 +158,11 @@ module Solution {
             return new Player(this.row, this.col, world);
         }
 
-        protected isRounded(): boolean {
+        public isRounded(): boolean {
             return false;
         }
 
-        protected isConsumable(): boolean {
+        public isConsumable(): boolean {
             return true;
         }
     }
@@ -98,11 +178,11 @@ module Solution {
             return new EdgeWall(this.row, this.col, world);
         }
 
-        protected isRounded(): boolean {
+        public isRounded(): boolean {
             return false;
         }
 
-        protected isConsumable(): boolean {
+        public isConsumable(): boolean {
             return false;
         }
     }
@@ -190,11 +270,11 @@ module Solution {
             */
         }
 
-        protected isRounded(): boolean {
+        public isRounded(): boolean {
             return false;
         }
 
-        protected isConsumable(): boolean {
+        public isConsumable(): boolean {
             return true;
         }
     }
@@ -218,16 +298,18 @@ module Solution {
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
                     let subj: Subj = null;
 
-                    if (screen[row][col] == Player.CHAR) {
+                    if (screen[row][col] === Player.CHAR) {
                         subj = new Player(row, col, this);
 
-                    } else if (screen[row][col] == EdgeWall.CHAR) {
+                    } else if (screen[row][col] === EdgeWall.CHAR
+                        || screen[row][col] === ':'
+                        || screen[row][col] === '+') {
                         subj = new EdgeWall(row, col, this);
 
-                    } else if (screen[row][col] == Diamond.CHAR
-                        || screen[row][col] == ':'
-                        || screen[row][col] == 'O'
-                        || screen[row][col] == '+') {
+                    } else if (screen[row][col] === Stone.CHAR) {
+                        subj = new Stone(row, col, this);
+
+                    } else if (screen[row][col] === Diamond.CHAR) {
                         subj = new Diamond(row, col, this);
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
@@ -277,10 +359,13 @@ module Solution {
                     return false;
 
             } else if (left instanceof Fly || right instanceof Fly) {
-                if (!(left instanceof Fly && right instanceof Fly)) {
-                    //console.warn("cmp", left, right);
+                if (!(left instanceof Fly && right instanceof Fly))
                     return false;
-                }
+
+            } else if (left instanceof Stone || right instanceof Stone) {
+                if (!(left instanceof Stone && right instanceof Stone))
+                    return false;
+
             }
             return true;
         }
@@ -290,8 +375,7 @@ module Solution {
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
                     let m = this.field[row][col];
                     let o = other.field[row][col];
-                    if (!this.compareSubjs(m, o))
-                        return false;
+                    console.assert(this.compareSubjs(m, o), "fail at", row, ",", col);
                 }
             }
             return true;
