@@ -65,14 +65,14 @@ module Solution {
         }
     }
 
-    class Diamon extends Subj implements Fallable {
+    class Diamond extends Subj implements Fallable {
         public static CHAR: string = '*';
 
         public shouldFall: boolean = false;
         public readedChar: string = '?';
 
-        public clone(world: World): Diamon {
-            return new Diamon(this.row, this.col, world);
+        public clone(world: World): Diamond {
+            return new Diamond(this.row, this.col, world);
         }
     }
 
@@ -168,12 +168,12 @@ module Solution {
                     if (screen[row][col] == Player.CHAR) {
                         subj = new Player(row, col, this);
 
-                    } else if (screen[row][col] == Diamon.CHAR
+                    } else if (screen[row][col] == Diamond.CHAR
                         || screen[row][col] == ':'
                         || screen[row][col] == 'O'
                         || screen[row][col] == '+'
                         || screen[row][col] == '#') {
-                        subj = new Diamon(row, col, this);
+                        subj = new Diamond(row, col, this);
                         subj.readedChar = screen[row][col];
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
@@ -241,7 +241,7 @@ module Solution {
     export class Field {
         private screen: Array<string>;
         private player: Player;
-        private diamonds: Array<Subj> = [];
+        private Diamondds: Array<Subj> = [];
         private flies: Array<Fly> = [];
 
         private dist: Array<Array<number>>;
@@ -254,8 +254,8 @@ module Solution {
                     if (screen[row][col] == Player.CHAR) {
                         this.player = new Player(row, col, null);
 
-                    } else if (screen[row][col] == Diamon.CHAR) {
-                        this.diamonds.push(new Diamon(row, col, null));
+                    } else if (screen[row][col] == Diamond.CHAR) {
+                        this.Diamondds.push(new Diamond(row, col, null));
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
                         this.flies.push(new Fly(row, col, null, Direction.Up));
@@ -264,44 +264,11 @@ module Solution {
             }
         }
 
-        public doTurn(): Field {
-            let screen: Array<Array<string>> = [];
-            for (let row = 0; row < FIELD_HEIGHT; ++row) {
-                screen.push([]);
-                for (let col = 0; col < FIELD_WIDTH; ++col)
-                    screen[row].push(this.screen[row][col]);
-            }
-
-            for (let fly of this.flies) {
-                
-            }
-
-            let field = new Field(screen.map(s => s.join('')));
-            // flies change their directions
-            return field;
-        }
-
-        public debugCompare(other: Field): boolean {
-            for (var row = 0; row < FIELD_HEIGHT; ++row)
-                for (var col = 0; col < FIELD_WIDTH; ++col) {
-                    //if (this.screen[row][col])
-                    if (this.screen[row][col] != other.screen[row][col])
-                        return false;
-                }
-            return true;
-        }
-
         private canGo(fromRow: number, fromCol: number, toRow: number, toCol: number): boolean {
             let to = this.screen[toRow][toCol];
             let fr = this.screen[fromRow][fromCol];
             if (to == 'O' || to == '+' || to == '#')
                 return false;
-                /*
-            if (fromRow == this.player.row && fromCol == this.player.col) {
-                if (to == '-' || to == '\\' || to == '/' || to == '|')
-                    return false;
-            }
-            */
             return true;
         }
 
