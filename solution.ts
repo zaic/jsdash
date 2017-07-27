@@ -47,12 +47,24 @@ module Solution {
             [this.row, this.col] = [nrow, ncol];
         }
 
-        protected abstract isRounder(): boolean;
+        protected abstract isRounded(): boolean;
         protected abstract isConsumable(): boolean;
     }
 
-    interface Fallable {
-        shouldFall: boolean;
+    abstract class Fallable extends Subj {
+        protected isFalling: boolean = false;
+
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
+
+        protected isRounded(): boolean {
+            return !this.isFalling;
+        }
+
+        protected isConsumable(): boolean {
+            return true;
+        }
     }
 
     class Player extends Subj {
@@ -66,7 +78,7 @@ module Solution {
             return new Player(this.row, this.col, world);
         }
 
-        protected isRounder(): boolean {
+        protected isRounded(): boolean {
             return false;
         }
 
@@ -86,7 +98,7 @@ module Solution {
             return new EdgeWall(this.row, this.col, world);
         }
 
-        protected isRounder(): boolean {
+        protected isRounded(): boolean {
             return false;
         }
 
@@ -95,22 +107,17 @@ module Solution {
         }
     }
 
-    class Diamond extends Subj implements Fallable {
+    class Diamond extends Fallable {
         public static CHAR: string = '*';
 
-        public shouldFall: boolean = false;
-        public readedChar: string = '?';
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
 
         public clone(world: World): Diamond {
-            return new Diamond(this.row, this.col, world);
-        }
-
-        protected isRounder(): boolean {
-            return false;
-        }
-
-        protected isConsumable(): boolean {
-            return false;
+            let diamond = new Diamond(this.row, this.col, world);
+            diamond.isFalling = this.isFalling;
+            return diamond;
         }
     }
 
@@ -183,7 +190,7 @@ module Solution {
             */
         }
 
-        protected isRounder(): boolean {
+        protected isRounded(): boolean {
             return false;
         }
 
@@ -222,7 +229,6 @@ module Solution {
                         || screen[row][col] == 'O'
                         || screen[row][col] == '+') {
                         subj = new Diamond(row, col, this);
-                        subj.readedChar = screen[row][col];
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
                         subj = new Fly(row, col, this, Direction.Up);
