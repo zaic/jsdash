@@ -309,8 +309,7 @@ module Solution {
         }
 
         private explode() {
-            /*
-            this.alive = false;
+            // this.alive = false;
             let [rowFrom, rowTo] = [this.row - 1, this.row + 1];
             let [colFrom, colTo] = [this.col - 1, this.col + 1];
             for (let row = rowFrom; row <= rowTo; ++row) {
@@ -327,8 +326,7 @@ module Solution {
                     this.world.set(point, new Explosion(this.world));
                 }
             }
-            this.world.butterfly_killed();
-            */
+            //this.world.butterfly_killed();
         }
 
         public isRounded(): boolean {
