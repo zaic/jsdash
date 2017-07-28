@@ -86,8 +86,7 @@ module Solution {
         public abstract isRounded(): boolean;
         public abstract isConsumable(): boolean;
 
-        public hit() {
-        }
+        public hit() {}
     }
 
     class Brick extends Subj {
@@ -191,6 +190,8 @@ module Solution {
     class Player extends Subj {
         public static CHAR: string = 'A';
 
+        public alive: boolean = true;
+
         constructor(row: number, col: number, world: World) {
             super(row, col, world);
         }
@@ -205,6 +206,10 @@ module Solution {
 
         public isConsumable(): boolean {
             return true;
+        }
+
+        public hit() {
+            this.alive = false;
         }
     }
 
@@ -317,6 +322,10 @@ module Solution {
 
         public isConsumable(): boolean {
             return true;
+        }
+
+        public hit() {
+            this.explode();
         }
     }
 
