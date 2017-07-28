@@ -87,6 +87,8 @@ module Solution {
         public abstract isConsumable(): boolean;
 
         public hit() {}
+
+        public walkInto(): boolean { return false; }
     }
 
     class Brick extends Subj {
@@ -127,6 +129,8 @@ module Solution {
         public isConsumable(): boolean {
             return true;
         }
+
+        public walkInto(): boolean { return true; }
     }
 
     abstract class Fallable extends Subj {
@@ -184,6 +188,17 @@ module Solution {
             let stone = new Stone(this.row, this.col, world);
             stone.isFalling = this.isFalling;
             return stone;
+        }
+
+        public walk_into(dir: Direction) {
+            if (this.isFalling || dir === Direction.Up || dir === Direction.Down)
+                return false;
+            let to = this.point().step(dir);
+            if (!this.world.get(to.row, to.col)) {
+                this.moveToPoint(to);
+                return true;
+            }
+            return false;
         }
     }
 
@@ -327,6 +342,11 @@ module Solution {
         public hit() {
             this.explode();
         }
+
+        public walk_into(dir: Direction) {
+            //this.world.diamond_collected();
+            return true;
+        }
     }
 
     export class World {
@@ -424,6 +444,9 @@ module Solution {
                 if (!(left instanceof Diamond && right instanceof Diamond))
                     return false;
 
+            } else if (left instanceof Dirt || right instanceof Dirt) {
+                if (!(left instanceof Dirt && right instanceof Dirt))
+                    return false;
             }
             return true;
         }
