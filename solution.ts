@@ -72,9 +72,7 @@ module Solution {
 
         protected move(dir: Direction) {
             const [nrow, ncol] = [this.row + MOVEMENT[dir][0], this.col + MOVEMENT[dir][1]];
-            this.world.field[nrow][ncol] = this;
-            this.world.field[this.row][this.col] = null;
-            [this.row, this.col] = [nrow, ncol];
+            return this.moveToPoint(new Point(nrow, ncol));
         }
         protected moveToPoint(point: Point) {
             const [nrow, ncol] = [point.row, point.col];
@@ -88,7 +86,7 @@ module Solution {
 
         public hit() {}
 
-        public walkInto(): boolean { return false; }
+        public walkInto(dir: Direction): boolean { return false; }
     }
 
     class Babah extends Subj {
@@ -219,7 +217,7 @@ module Solution {
             return stone;
         }
 
-        public walk_into(dir: Direction) {
+        public walkInto(dir: Direction) {
             if (this.isFalling || dir === Direction.Up || dir === Direction.Down)
                 return false;
             let to = this.point().step(dir);
@@ -235,6 +233,7 @@ module Solution {
         public static CHAR: string = 'A';
 
         public alive: boolean = true;
+        public turnDirection: Direction = null;
 
         constructor(row: number, col: number, world: World) {
             super(row, col, world);
@@ -254,6 +253,17 @@ module Solution {
 
         public hit() {
             this.alive = false;
+        }
+
+        public doTurn() {
+            super.doTurn();
+            if (!this.turnDirection)
+                return;
+            let to = this.point().step(this.turnDirection);
+            let target = this.world.get(to.row, to.col);
+            if (!target || target.walkInto(this.turnDirection))
+                this.moveToPoint(to);
+            this.turnDirection = null;
         }
     }
 
@@ -288,6 +298,12 @@ module Solution {
             let diamond = new Diamond(this.row, this.col, world);
             diamond.isFalling = this.isFalling;
             return diamond;
+        }
+
+
+        public walkInto(dir: Direction) {
+            //this.world.diamond_collected();
+            return true;
         }
     }
 
@@ -371,17 +387,15 @@ module Solution {
         public hit() {
             this.explode();
         }
-
-        public walk_into(dir: Direction) {
-            //this.world.diamond_collected();
-            return true;
-        }
     }
 
     export class World {
         public field: Array<Array<Subj>>;
 
         public frame: number = 0;
+        public score: number = 0;
+
+        private playerTurn: Direction = null;
 
         constructor(initializer: (World|Array<string>)) {
             this.field = [];
@@ -434,11 +448,18 @@ module Solution {
         private initFromField(other: World) {
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 let convertedRow: Array<Subj> = [];
-                for (let col = 0; col < FIELD_WIDTH; ++col)
-                    convertedRow.push(other.field[row][col].clone(this));
+                for (let col = 0; col < FIELD_WIDTH; ++col) {
+                    let osubj = other.field[row][col];
+                    convertedRow.push(osubj ? osubj.clone(this) : null);
+                }
                 this.field.push(convertedRow);
             }
             this.frame = other.frame;
+            this.score = other.score;
+        }
+
+        public setPlayerTurn(dir: Direction) {
+            this.playerTurn = dir;
         }
 
         public doTurn() {
@@ -446,6 +467,8 @@ module Solution {
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
                     let subj = this.field[row][col];
+                    if (subj instanceof Player)
+                        subj.turnDirection = this.playerTurn;
                     if (subj && subj.lastTurnedFrame < this.frame)
                         subj.doTurn();
                 }
@@ -497,6 +520,30 @@ module Solution {
                 }
             }
             return true;
+        }
+    }
+
+    export class Hujak {
+        private static deep: number = 3;
+        //private static best: number = 100;
+
+        public hujak(start: World): Direction {
+            let prev: Array<World> = [start];
+            for (let iter = 0; iter < Hujak.deep; ++iter) {
+                let next: Array<World> = [];
+
+                for (let world of prev) {
+                    for (let dir of [0, 1, 2, 3]) {
+                        let cloned = new World(world);
+                        cloned.setPlayerTurn(dir);
+                        cloned.doTurn();
+                        next.push(cloned);
+                    }
+                }
+
+                prev = next;
+            }
+            return Direction.Left;
         }
     }
 
@@ -586,44 +633,19 @@ module Solution {
 
 declare var exports: any;
 exports.play = function*(screen) {
-    var lastWorld: Solution.World;
+    var homjak: Solution.World;
     while (true) {
-        /*
-        let field = new Solution.Field(screen);
-        console.log(field);
-        let turn = field.getTurn();
-        yield Solution.OUTPUT[turn];
-        */
-
         let world = new Solution.World(screen);
 
-        if (lastWorld)
-            console.warn("compare", world.compareWorlds(lastWorld));
+        if (homjak)
+            console.warn("compare", world.compareWorlds(homjak));
         else
-            lastWorld = world;
+            homjak = world;
 
-        lastWorld.doTurn();
-        yield 't';
-
-        /*
-        let x = field.player.col;
-        let y = field.player.row;
-        let moves = '';
-        if (' :*'.includes(screen[y-1][x]))
-            moves += 'u';
-        if (' :*'.includes(screen[y+1][x]))
-            moves += 'd';
-        if (' :*'.includes(screen[y][x+1])
-            || screen[y][x+1]=='O' && screen[y][x+2]==' ')
-        {
-            moves += 'r';
-        }
-        if (' :*'.includes(screen[y][x-1])
-            || screen[y][x-1]=='O' && screen[y][x-2]==' ')
-        {
-            moves += 'l';
-        }
-        yield moves[Math.floor(Math.random()*moves.length)];
-        */
+        let hujak = new Solution.Hujak();
+        let escheHomjak = hujak.hujak(homjak);
+        homjak.setPlayerTurn(escheHomjak);
+        homjak.doTurn();
+        yield Solution.OUTPUT[escheHomjak];
     }
 };
