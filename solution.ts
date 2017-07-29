@@ -91,6 +91,35 @@ module Solution {
         public walkInto(): boolean { return false; }
     }
 
+    class Babah extends Subj {
+        public stage: number = 0;
+
+        constructor(row: number, col: number, world: World) {
+            super(row, col, world);
+        }
+
+        public clone(world: World): Babah {
+            let babah = new Babah(this.row, this.col, world);
+            babah.stage = this.stage;
+            return babah;
+        }
+
+        public doTurn() {
+            super.doTurn();
+            ++this.stage;
+            if (this.stage > 3)
+                this.world.set(this.row, this.col, new Diamond(this.row, this.col, this.world));
+        }
+
+        public isRounded(): boolean {
+            return false;
+        }
+
+        public isConsumable(): boolean {
+            return false;
+        }
+    }
+
     class Brick extends Subj {
         public static CHAR: string = '+';
 
@@ -309,21 +338,23 @@ module Solution {
         }
 
         private explode() {
+            //console.assert(false, "explode", this.row, this.col);
             // this.alive = false;
             let [rowFrom, rowTo] = [this.row - 1, this.row + 1];
             let [colFrom, colTo] = [this.col - 1, this.col + 1];
             for (let row = rowFrom; row <= rowTo; ++row) {
                 for (let col = colFrom; col <= colTo; ++col) {
-                    let point = new Point(x, y);
-                    let target = this.world.get(point);
-                    if (target)
-                    {
-                        if (!target.is_consumable())
+                    let target = this.world.get(row, col);
+                    if (target) {
+                        if (!target.isConsumable())
                             continue;
-                        if (target!==this)
+                        if (target !== this)
                             target.hit();
                     }
-                    this.world.set(point, new Explosion(this.world));
+                    //console.warn("reset", row, col);
+                    let bah = new Babah(row, col, this.world);
+                    this.world.set(row, col, bah);
+                    bah.lastTurnedFrame = this.world.frame;
                 }
             }
             //this.world.butterfly_killed();
@@ -425,6 +456,10 @@ module Solution {
             return this.field[row][col];
         }
 
+        public set(row: number, col: number, subj: Subj) {
+            this.field[row][col] = subj;
+        }
+
         private compareSubjs(left: Subj, right: Subj): boolean {
             if (left instanceof Player || right instanceof Player) {
                 if (!(left instanceof Player && right instanceof Player))
@@ -438,13 +473,17 @@ module Solution {
                 if (!(left instanceof Stone && right instanceof Stone))
                     return false;
 
-            } else if (left instanceof Diamond || right instanceof Diamond) {
-                if (!(left instanceof Diamond && right instanceof Diamond))
-                    return false;
-
             } else if (left instanceof Dirt || right instanceof Dirt) {
                 if (!(left instanceof Dirt && right instanceof Dirt))
                     return false;
+
+            } else {
+                let ld = left instanceof Diamond || left instanceof Babah;
+                let rd = right instanceof Diamond || right instanceof Babah;
+                if (ld || rd) {
+                    if (!(ld && rd))
+                        return false;
+                }
             }
             return true;
         }
