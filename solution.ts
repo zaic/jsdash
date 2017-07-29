@@ -302,7 +302,7 @@ module Solution {
 
 
         public walkInto(dir: Direction) {
-            //this.world.diamond_collected();
+            this.world.diamondEated();
             return true;
         }
     }
@@ -373,7 +373,7 @@ module Solution {
                     bah.lastTurnedFrame = this.world.frame;
                 }
             }
-            //this.world.butterfly_killed();
+            this.world.flyKilled();
         }
 
         public isRounded(): boolean {
@@ -391,11 +391,20 @@ module Solution {
 
     export class World {
         public field: Array<Array<Subj>>;
-
         public frame: number = 0;
-        public score: number = 0;
-
         private playerTurn: Direction = null;
+
+        public initialTurn: Direction = null;
+        private score: number = 0;
+        public eatedDiamonds = 0;
+        public lastEatedDiamond = 0;
+
+        public getScore(): number {
+            let base = this.score;
+            base += this.eatedDiamonds * 50;
+            base -= this.lastEatedDiamond * 5;
+            return base;
+        }
 
         constructor(initializer: (World|Array<string>)) {
             this.field = [];
@@ -455,24 +464,37 @@ module Solution {
                 this.field.push(convertedRow);
             }
             this.frame = other.frame;
+            
+            this.initialTurn = other.initialTurn;
             this.score = other.score;
+            this.eatedDiamonds = other.eatedDiamonds;
+            this.lastEatedDiamond = other.eatedDiamonds;
         }
 
         public setPlayerTurn(dir: Direction) {
             this.playerTurn = dir;
         }
 
-        public doTurn() {
+        public doTurn(): boolean {
             ++this.frame;
+            let playerMoved = false;
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
                     let subj = this.field[row][col];
-                    if (subj instanceof Player)
+                    if (subj instanceof Player && subj.lastTurnedFrame < this.frame) {
                         subj.turnDirection = this.playerTurn;
-                    if (subj && subj.lastTurnedFrame < this.frame)
+                        const prevPosition = subj.point();
                         subj.doTurn();
+                        const currPosition = subj.point();
+                        if (prevPosition.row != currPosition.row || prevPosition.col != currPosition.col)
+                            playerMoved = true;
+
+                    } else if (subj && subj.lastTurnedFrame < this.frame) {
+                        subj.doTurn();
+                    }
                 }
             }
+            return playerMoved;
         }
 
         public get(row: number, col: number): Subj {
@@ -484,30 +506,22 @@ module Solution {
         }
 
         private compareSubjs(left: Subj, right: Subj): boolean {
-            if (left instanceof Player || right instanceof Player) {
-                if (!(left instanceof Player && right instanceof Player))
-                    return false;
-
-            } else if (left instanceof Fly || right instanceof Fly) {
-                if (!(left instanceof Fly && right instanceof Fly))
-                    return false;
-
-            } else if (left instanceof Stone || right instanceof Stone) {
-                if (!(left instanceof Stone && right instanceof Stone))
-                    return false;
-
-            } else if (left instanceof Dirt || right instanceof Dirt) {
-                if (!(left instanceof Dirt && right instanceof Dirt))
-                    return false;
-
-            } else {
-                let ld = left instanceof Diamond || left instanceof Babah;
-                let rd = right instanceof Diamond || right instanceof Babah;
-                if (ld || rd) {
-                    if (!(ld && rd))
+            const classTypes: Array<Function> = [Player, Fly, Stone, Dirt, Brick];
+            for (const classType of classTypes) {
+                const ltCondition = left  instanceof classType;
+                const rtCondition = right instanceof classType
+                if (ltCondition || rtCondition)
+                    if (!(ltCondition && rtCondition))
                         return false;
-                }
             }
+
+            let ld = left instanceof Diamond || left instanceof Babah;
+            let rd = right instanceof Diamond || right instanceof Babah;
+            if (ld || rd) {
+                if (!(ld && rd))
+                    return false;
+            }
+
             return true;
         }
 
@@ -521,29 +535,47 @@ module Solution {
             }
             return true;
         }
+
+
+
+        public flyKilled() {
+            this.score += 100;
+        }
+
+        public diamondEated() {
+            this.eatedDiamonds++;
+            this.lastEatedDiamond = this.frame;
+        }
     }
 
     export class Hujak {
-        private static deep: number = 3;
+        private static deep: number = 5;
         //private static best: number = 100;
 
         public hujak(start: World): Direction {
             let prev: Array<World> = [start];
+            let best: World = start;
             for (let iter = 0; iter < Hujak.deep; ++iter) {
                 let next: Array<World> = [];
-
                 for (let world of prev) {
                     for (let dir of [0, 1, 2, 3]) {
                         let cloned = new World(world);
+                        if (!cloned.initialTurn)
+                            cloned.initialTurn = dir;
                         cloned.setPlayerTurn(dir);
-                        cloned.doTurn();
-                        next.push(cloned);
+                        if (cloned.doTurn()) {
+                            if (cloned.getScore() > best.getScore())
+                                best = cloned;
+                            next.push(cloned);
+                        }
                     }
                 }
-
                 prev = next;
             }
-            return Direction.Left;
+
+            //const best = prev.reduce((best: World, curr: World) => best.getScore() > curr.getScore() ? best : curr);
+            console.warn("best", best.getScore());
+            return best.initialTurn;
         }
     }
 }
