@@ -256,7 +256,8 @@ module Solution {
         }
 
         public hit() {
-            this.alive = false;
+            this.alive;
+            this.world.playerKilled();
         }
 
         public doTurn() {
@@ -398,13 +399,14 @@ module Solution {
         public eatedDiamonds: number = 0;
         public lastEatedDiamond: number = 0;
         public nearestDiamonDist: number = 0;
+        public isAlive: boolean = true;
 
         private cachedScore: number = 0;
         public updateScore(): number {
             this.cachedScore = 0;
             //this.cachedScore += this.killedFlies * 1000;
             this.cachedScore += this.eatedDiamonds * 50;
-            //this.cachedScore -= this.nearestDiamonDist;
+            this.cachedScore -= this.nearestDiamonDist;
             this.cachedScore -= this.lastEatedDiamond;
             return this.cachedScore + 1000;
         }
@@ -414,10 +416,13 @@ module Solution {
             score.killedFlies = this.killedFlies;
             score.eatedDiamonds = this.eatedDiamonds;
             score.lastEatedDiamond = this.lastEatedDiamond;
+            score.isAlive = this.isAlive;
             return score;
         }
 
         public isBetter(other: Score): boolean {
+            if (this.isAlive != other.isAlive)
+                return this.isAlive;
             return this.cachedScore > other.cachedScore;
         }
     }
@@ -537,7 +542,8 @@ module Solution {
         }
 
         public setPlayerTurn(dir: Direction) {
-            this.player.turnDirection = this.playerTurn = dir;
+            if (this.player)
+                this.player.turnDirection = this.playerTurn = dir;
         }
 
         public doTurn(): boolean {
@@ -621,6 +627,10 @@ module Solution {
         public diamondEated() {
             this.score.eatedDiamonds++;
             this.score.lastEatedDiamond = this.frame;
+        }
+
+        public playerKilled() {
+            this.score.isAlive = false;
         }
     }
 
