@@ -525,17 +525,23 @@ module Solution {
         }
 
         private initFromField(other: World) {
-            for (let row = 0; row < FIELD_HEIGHT; ++row) {
-                let convertedRow: Array<Subj> = [];
-                for (let col = 0; col < FIELD_WIDTH; ++col) {
-                    let osubj = other.field[row][col];
-                    let csubj = osubj ? osubj.clone(this) : null;
-                    if (csubj instanceof Player)
-                        this.player = csubj;
-                    convertedRow.push(csubj);
+            for (let row = -Hujak.hujakDeepSize; row <= FIELD_HEIGHT + Hujak.hujakDeepSize; ++row)
+                this.field[row] = [];
+            const rowFr = Math.max(other.player.row - Hujak.hujakDeepSize, 0);
+            const rowTo = Math.min(other.player.row + Hujak.hujakDeepSize, FIELD_HEIGHT - 1); // inclusive
+            for (let row = rowFr; row <= rowTo; ++row) {
+                const offset = Hujak.hujakDeepSize - Math.abs(row - other.player.row);
+                const colFr = Math.max(other.player.col - offset, 0);
+                const colTo = Math.min(other.player.col + offset, FIELD_WIDTH - 1);
+                for (let col = colFr; col <= colTo; ++col) {
+                    const osubj = other.field[row][col];
+                    if (osubj) {
+                        const csubj = osubj.clone(this);
+                        this.field[row][col] = csubj;
+                    }
                 }
-                this.field.push(convertedRow);
             }
+            this.player = this.field[other.player.row][other.player.col] as Player; // infa 146%
             this.frame = other.frame;
             this.diamonds = other.diamonds; // initial diamonds list
             
@@ -549,19 +555,25 @@ module Solution {
         }
 
         public doTurn(): boolean {
+            return this.isOriginaWorld ? this.doFullTurn() : this.doFastTurn();
+        }
+
+        private doFastTurn(): boolean {
             ++this.frame;
             let playerMoved = false;
-            for (let row = 0; row < FIELD_HEIGHT; ++row) {
-                for (let col = 0; col < FIELD_WIDTH; ++col) {
+            const rowFr = Math.max(this.player.row - Hujak.hujakDeepSize, 0);
+            const rowTo = Math.min(this.player.row + Hujak.hujakDeepSize, FIELD_HEIGHT - 1); // inclusive
+            for (let row = rowFr; row <= rowTo; ++row) {
+                const offset = Hujak.hujakDeepSize - Math.abs(row - this.player.row);
+                const colFr = Math.max(this.player.col - offset, 0);
+                const colTo = Math.min(this.player.col + offset, FIELD_WIDTH - 1);
+                for (let col = colFr; col <= colTo; ++col) {
                     let subj = this.field[row][col];
                     if (subj instanceof Player && subj.lastTurnedFrame < this.frame) {
                         subj.turnDirection = this.playerTurn;
                         const prevPosition = subj.point();
-                        //console.warn("do from", prevPosition, ".....");
-                        //console.warn("do direction", subj.turnDirection);
                         subj.doTurn();
                         const currPosition = subj.point();
-                        //console.warn("do to", currPosition, "......");
                         if (prevPosition.row != currPosition.row || prevPosition.col != currPosition.col)
                             playerMoved = true;
 
@@ -570,10 +582,30 @@ module Solution {
                     }
                 }
             }
-            if (this.isOriginaWorld)
-                this.initInternalData();
-            else
-                this.updateScoreData();
+            this.updateScoreData();
+            return playerMoved;
+        }
+
+        private doFullTurn(): boolean {
+            ++this.frame;
+            let playerMoved = false;
+            for (let row = 0; row < FIELD_HEIGHT; ++row) {
+                for (let col = 0; col < FIELD_WIDTH; ++col) {
+                    let subj = this.field[row][col];
+                    if (subj instanceof Player && subj.lastTurnedFrame < this.frame) {
+                        subj.turnDirection = this.playerTurn;
+                        const prevPosition = subj.point();
+                        subj.doTurn();
+                        const currPosition = subj.point();
+                        if (prevPosition.row != currPosition.row || prevPosition.col != currPosition.col)
+                            playerMoved = true;
+
+                    } else if (subj && subj.lastTurnedFrame < this.frame) {
+                        subj.doTurn();
+                    }
+                }
+            }
+            this.initInternalData();
             return playerMoved;
         }
 
@@ -661,15 +693,15 @@ module Solution {
                         //console.warn("!!!", cloned.player.point());
                     }
                 }
-                console.warn("iteration", iter, next.length, "                     ");
+                //console.warn("iteration", iter, next.length, "                     ");
                 prev = next.sort((best: World, curr: World) => best.isBetter(curr) ? -1 : 1).slice(0, Hujak.bestSize);
                 if (prev.length === 0)
                     break;
-                console.warn("best score is", prev[0].debugGetScore(), "              ");
+                //console.warn("best score is", prev[0].debugGetScore(), "              ");
             }
 
             //const best = prev.reduce((best: World, curr: World) => best.getScore() > curr.getScore() ? best : curr);
-            console.warn("best", best.debugGetScore(), "                   ");
+            //console.warn("best", best.debugGetScore(), "                   ");
             return best.initialTurn;
         }
     }
