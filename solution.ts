@@ -130,7 +130,7 @@ module Solution {
         }
 
         public clone(world: World): Brick {
-            return new Brick(this.row, this.col, world);
+            return this;//new Brick(this.row, this.col, world);
         }
 
         public isRounded(): boolean {
@@ -150,7 +150,7 @@ module Solution {
         }
 
         public clone(world: World): Dirt {
-            return new Dirt(this.row, this.col, world);
+            return this;//new Dirt(this.row, this.col, world);
         }
 
         public isRounded(): boolean {
@@ -280,7 +280,7 @@ module Solution {
         }
 
         public clone(world: World): EdgeWall {
-            return new EdgeWall(this.row, this.col, world);
+            return this; //new EdgeWall(this.row, this.col, world);
         }
 
         public isRounded(): boolean {
@@ -481,6 +481,9 @@ module Solution {
         }
 
         private initFromScreen(screen: Array<string>) {
+            this.field = [];
+            for (let row = -Hujak.hujakDeepSize; row <= FIELD_HEIGHT + Hujak.hujakDeepSize; ++row)
+                this.field[row] = [];
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 let convertedRow: Array<Subj> = [];
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
@@ -518,15 +521,17 @@ module Solution {
 
                     convertedRow.push(subj);
                 }
-                this.field.push(convertedRow);
+                this.field[row] = convertedRow;
             }
             this.isOriginaWorld = true;
             this.initInternalData();
         }
 
         private initFromField(other: World) {
+            this.field = [];
             for (let row = -Hujak.hujakDeepSize; row <= FIELD_HEIGHT + Hujak.hujakDeepSize; ++row)
                 this.field[row] = [];
+            /*
             const rowFr = Math.max(other.player.row - Hujak.hujakDeepSize, 0);
             const rowTo = Math.min(other.player.row + Hujak.hujakDeepSize, FIELD_HEIGHT - 1); // inclusive
             for (let row = rowFr; row <= rowTo; ++row) {
@@ -534,6 +539,11 @@ module Solution {
                 const colFr = Math.max(other.player.col - offset, 0);
                 const colTo = Math.min(other.player.col + offset, FIELD_WIDTH - 1);
                 for (let col = colFr; col <= colTo; ++col) {
+                    */
+            {
+                for (let diff of Hujak.hujakDeepIndices) {
+                    const row = other.player.row + diff.row;
+                    const col = other.player.col + diff.col;
                     const osubj = other.field[row][col];
                     if (osubj) {
                         const csubj = osubj.clone(this);
@@ -670,6 +680,7 @@ module Solution {
 
     export class Hujak {
         public static hujakDeepSize = 8;
+        public static hujakDeepIndices: Array<{row: number, col: number}> = [];
 
         private static deepSize: number = 8;
         private static bestSize: number = 100;
@@ -704,12 +715,25 @@ module Solution {
             //console.warn("best", best.debugGetScore(), "                   ");
             return best.initialTurn;
         }
+
+        public static generateIndices(): Array<{row: number, col: number}> {
+            let res = [];
+            for (let row = -Hujak.hujakDeepIndices; row <= Hujak.hujakDeepSize; ++row) {
+                const offset = Hujak.hujakDeepSize - row;
+                const colFr = -offset;
+                const colTo = +offset;
+                for (let col = colFr; col <= colTo; ++col)
+                    res.push({row: row, col: col});
+            }
+            return res;
+        }
     }
 }
 
 declare var exports: any;
 exports.play = function*(screen) {
     var homjak: Solution.World;
+    Solution.Hujak.hujakDeepIndices = Solution.Hujak.generateIndices();
     while (true) {
         let world = new Solution.World(screen);
 
