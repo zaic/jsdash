@@ -404,7 +404,7 @@ module Solution {
         private cachedScore: number = 0;
         public updateScore(): number {
             this.cachedScore = 0;
-            //this.cachedScore += this.killedFlies * 1000;
+            this.cachedScore += this.killedFlies * 1000;
             this.cachedScore += this.eatedDiamonds * 50;
             this.cachedScore -= this.nearestDiamonDist;
             this.cachedScore -= this.lastEatedDiamond;
