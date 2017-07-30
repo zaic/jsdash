@@ -404,8 +404,8 @@ module Solution {
         private cachedScore: number = 0;
         public updateScore(): number {
             this.cachedScore = 0;
-            this.cachedScore += this.killedFlies * 1000;
-            this.cachedScore += this.eatedDiamonds * 50;
+            //this.cachedScore += this.killedFlies * 1000000;
+            this.cachedScore += this.eatedDiamonds * 500;
             this.cachedScore -= this.nearestDiamonDist;
             this.cachedScore -= this.lastEatedDiamond;
             return this.cachedScore + 1000;
@@ -423,6 +423,8 @@ module Solution {
         public isBetter(other: Score): boolean {
             if (this.isAlive != other.isAlive)
                 return this.isAlive;
+            if (this.killedFlies != other.killedFlies)
+                return this.killedFlies > other.killedFlies;
             return this.cachedScore > other.cachedScore;
         }
     }
@@ -635,7 +637,7 @@ module Solution {
     }
 
     export class Hujak {
-        public static hujakDeepSize = 10;
+        public static hujakDeepSize = 8;
 
         private static deepSize: number = 8;
         private static bestSize: number = 100;
