@@ -43,6 +43,10 @@ module Solution {
         public down(): Point {
             return this.step(Direction.Down);
         }
+
+        public distTo(other: Point): number {
+            return Math.abs(this.row - other.row) + Math.abs(this.col - other.col);
+        }
     }
 
     abstract class Subj {
@@ -257,7 +261,7 @@ module Solution {
 
         public doTurn() {
             super.doTurn();
-            if (!this.turnDirection)
+            if (this.turnDirection === null)
                 return;
             let to = this.point().step(this.turnDirection);
             let target = this.world.get(to.row, to.col);
@@ -389,21 +393,49 @@ module Solution {
         }
     }
 
+    class Score {
+        public killedFlies: number = 0;
+        public eatedDiamonds: number = 0;
+        public lastEatedDiamond: number = 0;
+        public nearestDiamonDist: number = 0;
+
+        private cachedScore: number = 0;
+        public updateScore(): number {
+            this.cachedScore = 0;
+            //this.cachedScore += this.killedFlies * 1000;
+            this.cachedScore += this.eatedDiamonds * 50;
+            //this.cachedScore -= this.nearestDiamonDist;
+            this.cachedScore -= this.lastEatedDiamond;
+            return this.cachedScore + 1000;
+        }
+
+        public clone(): Score {
+            let score = new Score();
+            score.killedFlies = this.killedFlies;
+            score.eatedDiamonds = this.eatedDiamonds;
+            score.lastEatedDiamond = this.lastEatedDiamond;
+            return score;
+        }
+
+        public isBetter(other: Score): boolean {
+            return this.cachedScore > other.cachedScore;
+        }
+    }
+
     export class World {
         public field: Array<Array<Subj>>;
         public frame: number = 0;
         private playerTurn: Direction = null;
+        public player: Player = null;
+
+        private isOriginaWorld = false;
+        private diamonds: Array<Diamond> = [];
 
         public initialTurn: Direction = null;
-        private score: number = 0;
-        public eatedDiamonds = 0;
-        public lastEatedDiamond = 0;
+        private score: Score = new Score();
 
-        public getScore(): number {
-            let base = this.score;
-            base += this.eatedDiamonds * 50;
-            base -= this.lastEatedDiamond * 5;
-            return base;
+        public isBetter(other: World): boolean {
+            return this.score.isBetter(other.score);
         }
 
         constructor(initializer: (World|Array<string>)) {
@@ -414,6 +446,33 @@ module Solution {
                 this.initFromScreen(initializer);
         }
 
+        private initInternalData() {
+            this.diamonds = [];
+            for (let row = 0; row < FIELD_HEIGHT; ++row) {
+                for (let col = 0; col < FIELD_WIDTH; ++col) {
+                    let subj = this.field[row][col];
+                    if (subj instanceof Diamond) {
+                        const dist = this.player.point().distTo(subj.point());
+                        if (dist > Hujak.hujakDeepSize)
+                            this.diamonds.push(subj);
+                    }
+                }
+            }
+            this.score.nearestDiamonDist = 100500;
+        }
+
+        private updateScoreData() {
+            if (!this.player)
+                return ;
+            this.score.nearestDiamonDist = 100500;
+            for (let diamond of this.diamonds) {
+                const dist = this.player.point().distTo(diamond.point());
+                if (dist < this.score.nearestDiamonDist)
+                    this.score.nearestDiamonDist = dist;
+            }
+            this.score.updateScore();
+        }
+
         private initFromScreen(screen: Array<string>) {
             for (let row = 0; row < FIELD_HEIGHT; ++row) {
                 let convertedRow: Array<Subj> = [];
@@ -421,7 +480,8 @@ module Solution {
                     let subj: Subj = null;
 
                     if (screen[row][col] === Player.CHAR) {
-                        subj = new Player(row, col, this);
+                        this.player = new Player(row, col, this);
+                        subj = this.player;
 
                     } else if (screen[row][col] === EdgeWall.CHAR) {
                         subj = new EdgeWall(row, col, this);
@@ -436,7 +496,8 @@ module Solution {
                         subj = new Dirt(row, col, this);
 
                     } else if (screen[row][col] === Diamond.CHAR) {
-                        subj = new Diamond(row, col, this);
+                        let diamond = new Diamond(row, col, this);
+                        subj = diamond;
 
                     } else if (Fly.CHAR.includes(screen[row][col])) { //!todo: optimize using frame id
                         subj = new Fly(row, col, this, Direction.Up);
@@ -452,6 +513,8 @@ module Solution {
                 }
                 this.field.push(convertedRow);
             }
+            this.isOriginaWorld = true;
+            this.initInternalData();
         }
 
         private initFromField(other: World) {
@@ -459,20 +522,22 @@ module Solution {
                 let convertedRow: Array<Subj> = [];
                 for (let col = 0; col < FIELD_WIDTH; ++col) {
                     let osubj = other.field[row][col];
-                    convertedRow.push(osubj ? osubj.clone(this) : null);
+                    let csubj = osubj ? osubj.clone(this) : null;
+                    if (csubj instanceof Player)
+                        this.player = csubj;
+                    convertedRow.push(csubj);
                 }
                 this.field.push(convertedRow);
             }
             this.frame = other.frame;
+            this.diamonds = other.diamonds; // initial diamonds list
             
             this.initialTurn = other.initialTurn;
-            this.score = other.score;
-            this.eatedDiamonds = other.eatedDiamonds;
-            this.lastEatedDiamond = other.eatedDiamonds;
+            this.score = other.score.clone();
         }
 
         public setPlayerTurn(dir: Direction) {
-            this.playerTurn = dir;
+            this.player.turnDirection = this.playerTurn = dir;
         }
 
         public doTurn(): boolean {
@@ -484,8 +549,11 @@ module Solution {
                     if (subj instanceof Player && subj.lastTurnedFrame < this.frame) {
                         subj.turnDirection = this.playerTurn;
                         const prevPosition = subj.point();
+                        //console.warn("do from", prevPosition, ".....");
+                        //console.warn("do direction", subj.turnDirection);
                         subj.doTurn();
                         const currPosition = subj.point();
+                        //console.warn("do to", currPosition, "......");
                         if (prevPosition.row != currPosition.row || prevPosition.col != currPosition.col)
                             playerMoved = true;
 
@@ -494,6 +562,10 @@ module Solution {
                     }
                 }
             }
+            if (this.isOriginaWorld)
+                this.initInternalData();
+            else
+                this.updateScoreData();
             return playerMoved;
         }
 
@@ -536,45 +608,56 @@ module Solution {
             return true;
         }
 
+        public debugGetScore(): number {
+            return this.score.updateScore();
+        }
+
 
 
         public flyKilled() {
-            this.score += 100;
+            this.score.killedFlies++;
         }
 
         public diamondEated() {
-            this.eatedDiamonds++;
-            this.lastEatedDiamond = this.frame;
+            this.score.eatedDiamonds++;
+            this.score.lastEatedDiamond = this.frame;
         }
     }
 
     export class Hujak {
-        private static deep: number = 5;
-        //private static best: number = 100;
+        public static hujakDeepSize = 10;
+
+        private static deepSize: number = 8;
+        private static bestSize: number = 100;
 
         public hujak(start: World): Direction {
             let prev: Array<World> = [start];
             let best: World = start;
-            for (let iter = 0; iter < Hujak.deep; ++iter) {
+            for (let iter = 0; iter < Hujak.deepSize; ++iter) {
                 let next: Array<World> = [];
                 for (let world of prev) {
-                    for (let dir of [0, 1, 2, 3]) {
+                    for (let dir of [Direction.Up, Direction.Right, Direction.Down, Direction.Left]) {
                         let cloned = new World(world);
-                        if (!cloned.initialTurn)
+                        if (cloned.initialTurn === null)
                             cloned.initialTurn = dir;
                         cloned.setPlayerTurn(dir);
                         if (cloned.doTurn()) {
-                            if (cloned.getScore() > best.getScore())
+                            if (cloned.isBetter(best))
                                 best = cloned;
                             next.push(cloned);
                         }
+                        //console.warn("!!!", cloned.player.point());
                     }
                 }
-                prev = next;
+                console.warn("iteration", iter, next.length, "                     ");
+                prev = next.sort((best: World, curr: World) => best.isBetter(curr) ? -1 : 1).slice(0, Hujak.bestSize);
+                if (prev.length === 0)
+                    break;
+                console.warn("best score is", prev[0].debugGetScore(), "              ");
             }
 
             //const best = prev.reduce((best: World, curr: World) => best.getScore() > curr.getScore() ? best : curr);
-            console.warn("best", best.getScore());
+            console.warn("best", best.debugGetScore(), "                   ");
             return best.initialTurn;
         }
     }
