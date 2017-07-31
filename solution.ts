@@ -674,7 +674,12 @@ module Solution {
         private static deepSize: number = 8;
         private static bestSize: number = 100;
 
+        
+
         public hujak(start: World): Direction {
+            const startTime = Date.now();
+            const timeToTurn = Hujak.getTimeToTurn(start.frame);
+
             let prev: Array<World> = [start];
             let best: World = start;
             for (let iter = 0; iter < Hujak.deepSize; ++iter) {
@@ -693,16 +698,35 @@ module Solution {
                         //console.warn("!!!", cloned.player.point());
                     }
                 }
-                //console.warn("iteration", iter, next.length, "                     ");
+                console.warn("iteration", iter, next.length, "                     ");
                 prev = next.sort((best: World, curr: World) => best.isBetter(curr) ? -1 : 1).slice(0, Hujak.bestSize);
                 if (prev.length === 0)
                     break;
-                //console.warn("best score is", prev[0].debugGetScore(), "              ");
+
+                const currTime = Date.now();
+                console.warn("time", currTime - startTime, "of", timeToTurn);
+                if (currTime - startTime > timeToTurn)
+                    break;
             }
 
             //const best = prev.reduce((best: World, curr: World) => best.getScore() > curr.getScore() ? best : curr);
             //console.warn("best", best.debugGetScore(), "                   ");
             return best.initialTurn;
+        }
+
+
+
+        private static getGapToTurn(frame: number): number {
+            if (frame <= 5)
+                return 0.5;
+            return 0.9;
+        }
+
+        private static getTimeToTurn(frame: number): number {
+            const milliseconds = 1000;
+            const fps = 60.0;
+            const gap = this.getGapToTurn(frame);
+            return milliseconds * gap / fps;
         }
     }
 }
@@ -713,10 +737,11 @@ exports.play = function*(screen) {
     while (true) {
         let world = new Solution.World(screen);
 
-        if (homjak)
+        if (homjak) {
             console.warn("compare", world.compareWorlds(homjak));
-        else
+        } else {
             homjak = world;
+        }
 
         let hujak = new Solution.Hujak();
         let escheHomjak = hujak.hujak(homjak);
