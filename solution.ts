@@ -307,7 +307,7 @@ module Solution {
 
 
         public walkInto(dir: Direction) {
-            this.world.diamondEated();
+            this.world.diamondEated(this);
             return true;
         }
     }
@@ -395,11 +395,15 @@ module Solution {
     }
 
     class Score {
+        public static NEVER: number = 100500;
+        public static FAR_FAR_GALAXY: number = 100500;
+
         public killedFlies: number = 0;
         public eatedDiamonds: number = 0;
         public lastEatedDiamond: number = 0;
-        public nearestDiamonDist: number = 0;
+        public nearestDiamonDist: number = Score.FAR_FAR_GALAXY;
         public isAlive: boolean = true;
+        public whenDiamondEated: number = Score.NEVER;
 
         private cachedScore: number = 0;
         public updateScore(): number {
@@ -417,6 +421,7 @@ module Solution {
             score.eatedDiamonds = this.eatedDiamonds;
             score.lastEatedDiamond = this.lastEatedDiamond;
             score.isAlive = this.isAlive;
+            score.whenDiamondEated = this.whenDiamondEated;
             return score;
         }
 
@@ -425,7 +430,80 @@ module Solution {
                 return this.isAlive;
             if (this.killedFlies != other.killedFlies)
                 return this.killedFlies > other.killedFlies;
-            return this.cachedScore > other.cachedScore;
+            if (this.whenDiamondEated !== other.whenDiamondEated)
+                return this.whenDiamondEated < other.whenDiamondEated;
+            return this.nearestDiamonDist < other.nearestDiamonDist;
+        }
+
+        public debugPrint() {
+            console.warn("score:",
+                "alive", this.isAlive,
+                "eated", this.eatedDiamonds,
+                "when last", this.lastEatedDiamond,
+                "dist to next", this.nearestDiamonDist,
+                "                   ");
+        }
+    }
+
+    class SquareHelper {
+        private static COLS = 4;
+        private static ROWS = 2;
+        private static CELLS = 8;
+        private static WIDTH = 10;
+        private static HEIGHT = 11;
+        
+        private squareId: Array<number> = [];
+        private startSquare: number = 0;
+
+        constructor(player: Player) {
+            for (let i = 0; i < SquareHelper.CELLS; ++i)
+                this.squareId[i] = i;
+            this.startSquare = this.getSquare(player.row, player.col);
+        }
+
+        public update(world: World) {
+            let diamondsBySquare: Array<Array<Diamond>> = [];
+            for (let i = 0; i < SquareHelper.CELLS; ++i)
+                diamondsBySquare.push([]);
+            for (let diamond of world.diamonds) {
+                const squareId = this.getSquare(diamond.row, diamond.col);
+                diamondsBySquare[squareId].push(diamond);
+            }
+
+            let orderedDiamonds = [];
+            for (let idx = 0; idx < SquareHelper.CELLS; ++idx) {
+                const squareId = (this.startSquare + idx) % SquareHelper.CELLS;
+                let squareSortedDiamonds = diamondsBySquare[squareId].sort((lt: Diamond, rt: Diamond) => {
+                    if (lt.row != rt.row)
+                        return lt.row - rt.row;
+                    return lt.col - rt.col;
+                });
+                squareSortedDiamonds.forEach((p: Diamond) => orderedDiamonds.push(p));
+
+                if (squareSortedDiamonds.length === 0)
+                    this.squareId[squareId] = this.getUpSquare(squareId);
+            }
+            world.diamonds = orderedDiamonds;
+
+            /*
+            console.warn("update result: ", orderedDiamonds[0].point(), this.startSquare, "                  ");
+            for (let idx = 0; idx < SquareHelper.CELLS; ++idx)
+                console.warn("square", idx, "size", diamondsBySquare[idx].length, "toid", this.squareId[idx], "                  .");
+                */
+        }
+
+
+        private getUpSquare(id: number) {
+            return id < 4 ? id : 7 - id;
+        }
+
+        private getSquare(row: number, col: number) {
+            const rid = (row / SquareHelper.HEIGHT) | 0; // integer division
+            const cid = (col / SquareHelper.WIDTH)  | 0; // integer division
+            let id = cid;
+            if (rid > 0)
+                id = 7 - id;
+            return this.squareId[id];
         }
     }
 
@@ -436,7 +514,8 @@ module Solution {
         public player: Player = null;
 
         private isOriginaWorld = false;
-        private diamonds: Array<Diamond> = [];
+        public diamonds: Array<Diamond> = [];
+        private squareHelper: SquareHelper = null;
 
         public initialTurn: Direction = null;
         private score: Score = new Score();
@@ -460,22 +539,25 @@ module Solution {
                     let subj = this.field[row][col];
                     if (subj instanceof Diamond) {
                         const dist = this.player.point().distTo(subj.point());
-                        if (dist > Hujak.hujakDeepSize)
+                        //if (dist > Hujak.hujakDeepSize)
                             this.diamonds.push(subj);
                     }
                 }
             }
-            this.score.nearestDiamonDist = 100500;
+            
+            this.score.nearestDiamonDist = Score.FAR_FAR_GALAXY;
+            this.score.whenDiamondEated = Score.NEVER;
+            this.squareHelper.update(this);
         }
 
         private updateScoreData() {
             if (!this.player)
                 return ;
-            this.score.nearestDiamonDist = 100500;
-            for (let diamond of this.diamonds) {
-                const dist = this.player.point().distTo(diamond.point());
-                if (dist < this.score.nearestDiamonDist)
-                    this.score.nearestDiamonDist = dist;
+            this.score.nearestDiamonDist = Score.FAR_FAR_GALAXY;
+            const targetDiamond = this.score.whenDiamondEated === Score.NEVER ? this.diamonds[0] : this.diamonds[1];
+            if (targetDiamond) {
+                const dist = this.player.point().distTo(targetDiamond.point());
+                this.score.nearestDiamonDist = dist;
             }
             this.score.updateScore();
         }
@@ -521,6 +603,7 @@ module Solution {
                 this.field.push(convertedRow);
             }
             this.isOriginaWorld = true;
+            this.squareHelper = new SquareHelper(this.player);
             this.initInternalData();
         }
 
@@ -544,6 +627,7 @@ module Solution {
             this.player = this.field[other.player.row][other.player.col] as Player; // infa 146%
             this.frame = other.frame;
             this.diamonds = other.diamonds; // initial diamonds list
+            this.squareHelper = other.squareHelper;
             
             this.initialTurn = other.initialTurn;
             this.score = other.score.clone();
@@ -648,8 +732,8 @@ module Solution {
             return true;
         }
 
-        public debugGetScore(): number {
-            return this.score.updateScore();
+        public debugPrint() {
+            this.score.debugPrint();
         }
 
 
@@ -658,9 +742,14 @@ module Solution {
             this.score.killedFlies++;
         }
 
-        public diamondEated() {
-            this.score.eatedDiamonds++;
+        public diamondEated(diamond: Diamond) {
             this.score.lastEatedDiamond = this.frame;
+            if (diamond === this.diamonds[0]) {
+                this.score.whenDiamondEated = this.frame;
+                this.score.eatedDiamonds++;
+            } else {
+                // penalty                
+            }
         }
 
         public playerKilled() {
@@ -710,7 +799,12 @@ module Solution {
             }
 
             //const best = prev.reduce((best: World, curr: World) => best.getScore() > curr.getScore() ? best : curr);
-            //console.warn("best", best.debugGetScore(), "                   ");
+            console.warn("best                                                                                ");
+            best.debugPrint();
+
+            // clean console
+            for (let idx = 0; idx < 10; ++idx)
+                console.warn("                                                                                ");
             return best.initialTurn;
         }
 
@@ -723,10 +817,13 @@ module Solution {
         }
 
         private static getTimeToTurn(frame: number): number {
+            return 100500; // for debug
+            /*
             const milliseconds = 1000;
             const fps = 60.0;
             const gap = this.getGapToTurn(frame);
             return milliseconds * gap / fps;
+            */
         }
     }
 }
