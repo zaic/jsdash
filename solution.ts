@@ -1,9 +1,11 @@
-module Solution {
+import Point = Geometry.Point;
+
+namespace Solution {
     const FIELD_HEIGHT : number = 22;
     const FIELD_WIDTH : number = 40;
 
-    enum Direction {Up, Right, Down, Left}
-    const MOVEMENT: Array<[number, number]> = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+    export const MOVEMENT: Array<[number, number]> = [[-1, 0], [0, 1], [1, 0], [0, -1]];
+    export enum Direction {Up, Right, Down, Left}
     export const OUTPUT = "urdl";
 
     //!todo: optimize directions
@@ -17,36 +19,6 @@ module Solution {
     }
     function GetDirectionCCW(dir: Direction): Direction {
         return GetDirectionCW(GetDirectionCW(GetDirectionCW(dir)));
-    }
-
-    class Point {
-        public row: number;
-        public col: number;
-        
-        constructor(row: number, col: number) {
-            this.row = row;
-            this.col = col;
-        }
-
-        public step(dir: Direction): Point {
-            return new Point(this.row + MOVEMENT[dir][0], this.col + MOVEMENT[dir][1]);
-        }
-        public left(): Point {
-            return this.step(Direction.Left);
-        }
-        public right(): Point {
-            return this.step(Direction.Right);
-        }
-        public up(): Point {
-            return this.step(Direction.Up);
-        }
-        public down(): Point {
-            return this.step(Direction.Down);
-        }
-
-        public distTo(other: Point): number {
-            return Math.abs(this.row - other.row) + Math.abs(this.col - other.col);
-        }
     }
 
     abstract class Subj {
